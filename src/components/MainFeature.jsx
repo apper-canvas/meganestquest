@@ -87,6 +87,15 @@ const initialProperties = [
 const MainFeature = () => {
   const [properties, setProperties] = useState(initialProperties);
   const [selectedProperty, setSelectedProperty] = useState(null);
+  const [scheduleProperty, setScheduleProperty] = useState(null);
+  const [isScheduleModalOpen, setIsScheduleModalOpen] = useState(false);
+  const [scheduleForm, setScheduleForm] = useState({
+    date: '',
+    time: '',
+    name: '',
+    email: '',
+    phone: ''
+  });
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [filters, setFilters] = useState({
     priceMin: "",
@@ -179,6 +188,47 @@ const MainFeature = () => {
   
   const closeModal = () => {
     setIsModalOpen(false);
+  };
+  
+  // Handle schedule visit
+  const handleScheduleVisit = (property) => {
+    setScheduleProperty(property);
+    setIsScheduleModalOpen(true);
+  };
+  
+  const closeScheduleModal = () => {
+    setIsScheduleModalOpen(false);
+    setScheduleForm({
+      date: '',
+      time: '',
+      name: '',
+      email: '',
+      phone: ''
+    });
+  };
+  
+  const handleScheduleFormChange = (e) => {
+    const { name, value } = e.target;
+    setScheduleForm(prev => ({
+      ...prev,
+      [name]: value
+    }));
+  };
+  
+  const handleScheduleSubmit = (e) => {
+    e.preventDefault();
+    
+    // Validate form
+    if (!scheduleForm.date || !scheduleForm.time || !scheduleForm.name || !scheduleForm.email) {
+      toast.error("Please fill out all required fields");
+      return;
+    }
+    
+    // Process form submission (in a real app, this would send data to a server)
+    toast.success(`Visit scheduled for ${scheduleForm.date} at ${scheduleForm.time}`);
+    
+    // Close modal and reset form
+    closeScheduleModal();
   };
 
   return (
@@ -356,7 +406,7 @@ const MainFeature = () => {
                     className="btn btn-outline px-3 py-1.5 text-sm">
                     <ApperIcon name="Info" size={16} className="mr-1" />
                   </button>
-                  <button className="btn btn-primary px-3 py-1.5 text-sm">
+                  <button onClick={() => handleScheduleVisit(property)} className="btn btn-primary px-3 py-1.5 text-sm">
                     <ApperIcon name="Calendar" size={16} className="mr-1" />
                     Schedule Visit
                   </button>
@@ -464,10 +514,94 @@ const MainFeature = () => {
                 <button onClick={closeModal} className="btn btn-outline">
                   Close
                 </button>
-                <button className="btn btn-primary">
+                <button onClick={() => handleScheduleVisit(selectedProperty)} className="btn btn-primary">
                   <ApperIcon name="Calendar" size={16} className="mr-2" /> Schedule Visit
                 </button>
               </div>
+            </div>
+          </motion.div>
+        </motion.div>
+      )}
+      
+      {/* Schedule Visit Modal */}
+      {isScheduleModalOpen && scheduleProperty && (
+        <motion.div 
+          className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50"
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          exit={{ opacity: 0 }}
+          onClick={closeScheduleModal}
+        >
+          <motion.div 
+            className="bg-white dark:bg-surface-800 rounded-xl max-w-lg w-full"
+            initial={{ y: 50, opacity: 0 }}
+            animate={{ y: 0, opacity: 1 }}
+            exit={{ y: 50, opacity: 0 }}
+            transition={{ type: "spring", damping: 25 }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="p-6">
+              <div className="flex justify-between items-center mb-6">
+                <h2 className="text-xl font-bold">Schedule a Visit</h2>
+                <button 
+                  onClick={closeScheduleModal}
+                  className="p-1 rounded-full hover:bg-surface-100 dark:hover:bg-surface-700"
+                >
+                  <ApperIcon name="X" size={20} />
+                </button>
+              </div>
+              
+              <p className="text-surface-600 dark:text-surface-400 mb-4">
+                You're scheduling a visit for <span className="font-semibold">{scheduleProperty.title}</span>
+              </p>
+              
+              <form onSubmit={handleScheduleSubmit}>
+                <div className="space-y-4 mb-6">
+                  <div className="grid grid-cols-2 gap-4">
+                    <div>
+                      <label className="block text-sm font-medium mb-1" htmlFor="date">Date *</label>
+                      <input 
+                        type="date" 
+                        id="date" 
+                        name="date" 
+                        value={scheduleForm.date} 
+                        onChange={handleScheduleFormChange} 
+                        className="input-field w-full" 
+                        required 
+                        min={new Date().toISOString().split('T')[0]}
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium mb-1" htmlFor="time">Time *</label>
+                      <input type="time" id="time" name="time" value={scheduleForm.time} onChange={handleScheduleFormChange} className="input-field w-full" required />
+                    </div>
+                  </div>
+                  
+                  <div>
+                    <label className="block text-sm font-medium mb-1" htmlFor="name">Your Name *</label>
+                    <input type="text" id="name" name="name" value={scheduleForm.name} onChange={handleScheduleFormChange} className="input-field w-full" required />
+                  </div>
+                  
+                  <div>
+                    <label className="block text-sm font-medium mb-1" htmlFor="email">Email Address *</label>
+                    <input type="email" id="email" name="email" value={scheduleForm.email} onChange={handleScheduleFormChange} className="input-field w-full" required />
+                  </div>
+                  
+                  <div>
+                    <label className="block text-sm font-medium mb-1" htmlFor="phone">Phone Number</label>
+                    <input type="tel" id="phone" name="phone" value={scheduleForm.phone} onChange={handleScheduleFormChange} className="input-field w-full" />
+                  </div>
+                </div>
+                
+                <div className="flex justify-end space-x-3 pt-4 border-t border-surface-200 dark:border-surface-700">
+                  <button type="button" onClick={closeScheduleModal} className="btn btn-outline">
+                    Cancel
+                  </button>
+                  <button type="submit" className="btn btn-primary">
+                    Confirm Visit
+                  </button>
+                </div>
+              </form>
             </div>
           </motion.div>
         </motion.div>
