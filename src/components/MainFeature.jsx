@@ -86,6 +86,8 @@ const initialProperties = [
 
 const MainFeature = () => {
   const [properties, setProperties] = useState(initialProperties);
+  const [selectedProperty, setSelectedProperty] = useState(null);
+  const [isModalOpen, setIsModalOpen] = useState(false);
   const [filters, setFilters] = useState({
     priceMin: "",
     priceMax: "",
@@ -167,6 +169,16 @@ const MainFeature = () => {
     const property = properties.find(p => p.id === id);
     const action = !property.favorite ? "added to" : "removed from";
     toast.success(`Property ${action} favorites`);
+  };
+  
+  // Show property details in modal
+  const showPropertyDetails = (property) => {
+    setSelectedProperty(property);
+    setIsModalOpen(true);
+  };
+  
+  const closeModal = () => {
+    setIsModalOpen(false);
   };
 
   return (
@@ -339,9 +351,10 @@ const MainFeature = () => {
                 </div>
                 
                 <div className="mt-4 pt-4 border-t border-surface-200 dark:border-surface-700 flex justify-between">
-                  <button className="btn btn-outline px-3 py-1.5 text-sm">
+                  <button 
+                    onClick={() => showPropertyDetails(property)}
+                    className="btn btn-outline px-3 py-1.5 text-sm">
                     <ApperIcon name="Info" size={16} className="mr-1" />
-                    Details
                   </button>
                   <button className="btn btn-primary px-3 py-1.5 text-sm">
                     <ApperIcon name="Calendar" size={16} className="mr-1" />
@@ -367,6 +380,98 @@ const MainFeature = () => {
           </div>
         )}
       </div>
+      
+      {/* Property Details Modal */}
+      {isModalOpen && selectedProperty && (
+        <motion.div 
+          className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50"
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          exit={{ opacity: 0 }}
+          onClick={closeModal}
+        >
+          <motion.div 
+            className="bg-white dark:bg-surface-800 rounded-xl max-w-4xl w-full max-h-[90vh] overflow-y-auto"
+            initial={{ y: 50, opacity: 0 }}
+            animate={{ y: 0, opacity: 1 }}
+            exit={{ y: 50, opacity: 0 }}
+            transition={{ type: "spring", damping: 25 }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="relative">
+              <img 
+                src={selectedProperty.image} 
+                alt={selectedProperty.title} 
+                className="w-full h-64 object-cover rounded-t-xl"
+              />
+              <button 
+                onClick={closeModal}
+                className="absolute top-4 right-4 p-2 bg-black/40 hover:bg-black/60 rounded-full text-white transition-colors"
+              >
+                <ApperIcon name="X" size={20} />
+              </button>
+              <div className="absolute top-4 left-4">
+                <span className="px-3 py-1.5 rounded-md text-sm font-semibold bg-primary text-white uppercase">
+                  {selectedProperty.status}
+                </span>
+              </div>
+            </div>
+            
+            <div className="p-6">
+              <div className="flex justify-between items-start mb-4">
+                <h2 className="text-2xl font-bold">{selectedProperty.title}</h2>
+                <p className="text-2xl font-bold text-primary">
+                  {selectedProperty.status === "for sale" 
+                    ? `$${selectedProperty.price.toLocaleString()}` 
+                    : `$${selectedProperty.price.toLocaleString()}/month`}
+                </p>
+              </div>
+              
+              <p className="text-surface-600 dark:text-surface-400 mb-6">
+                {selectedProperty.address}
+              </p>
+              
+              <div className="grid grid-cols-3 gap-4 mb-6">
+                <div className="bg-surface-100 dark:bg-surface-700 p-3 rounded-lg text-center">
+                  <div className="flex items-center justify-center mb-2">
+                    <ApperIcon name="Bed" className="mr-2" size={20} />
+                    <span className="text-lg font-semibold">{selectedProperty.bedrooms}</span>
+                  </div>
+                  <p className="text-sm text-surface-600 dark:text-surface-400">Bedrooms</p>
+                </div>
+                <div className="bg-surface-100 dark:bg-surface-700 p-3 rounded-lg text-center">
+                  <div className="flex items-center justify-center mb-2">
+                    <ApperIcon name="Bath" className="mr-2" size={20} />
+                    <span className="text-lg font-semibold">{selectedProperty.bathrooms}</span>
+                  </div>
+                  <p className="text-sm text-surface-600 dark:text-surface-400">Bathrooms</p>
+                </div>
+                <div className="bg-surface-100 dark:bg-surface-700 p-3 rounded-lg text-center">
+                  <div className="flex items-center justify-center mb-2">
+                    <ApperIcon name="SquareRoot" className="mr-2" size={20} />
+                    <span className="text-lg font-semibold">{selectedProperty.area}</span>
+                  </div>
+                  <p className="text-sm text-surface-600 dark:text-surface-400">Sq Ft</p>
+                </div>
+              </div>
+              
+              <h3 className="text-xl font-semibold mb-3">Description</h3>
+              <p className="text-surface-700 dark:text-surface-300 mb-6">
+                A beautiful {selectedProperty.type} located in a prime area. This property features {selectedProperty.bedrooms} bedrooms, {selectedProperty.bathrooms} bathrooms, and approximately {selectedProperty.area} square feet of living space. Perfect for families looking for comfort and convenience.
+              </p>
+              
+              <div className="flex justify-end space-x-4 mt-8 pt-4 border-t border-surface-200 dark:border-surface-700">
+                <button onClick={closeModal} className="btn btn-outline">
+                  Close
+                </button>
+                <button className="btn btn-primary">
+                  <ApperIcon name="Calendar" size={16} className="mr-2" /> Schedule Visit
+                </button>
+              </div>
+            </div>
+          </motion.div>
+        </motion.div>
+      )}
     </div>
   );
 };
