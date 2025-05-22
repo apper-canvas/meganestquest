@@ -1,91 +1,26 @@
 import { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
 import { toast } from 'react-toastify';
+import { useSelector } from 'react-redux';
 import ApperIcon from './ApperIcon';
-
-const initialProperties = [
-  {
-    id: 1,
-    title: "Modern Downtown Apartment",
-    price: 320000,
-    bedrooms: 2,
-    bathrooms: 2,
-    area: 1200,
-    address: "123 Urban St, Downtown, City",
-    type: "apartment",
-    status: "for sale",
-    image: "https://images.unsplash.com/photo-1545324418-cc1a3fa10c00?ixlib=rb-1.2.1&auto=format&fit=crop&w=1000&q=80",
-    favorite: false
-  },
-  {
-    id: 2,
-    title: "Suburban Family Home",
-    price: 450000,
-    bedrooms: 4,
-    bathrooms: 3,
-    area: 2400,
-    address: "456 Family Dr, Suburbia, County",
-    type: "house",
-    status: "for sale",
-    image: "https://images.unsplash.com/photo-1568605114967-8130f3a36994?ixlib=rb-1.2.1&auto=format&fit=crop&w=1000&q=80",
-    favorite: false
-  },
-  {
-    id: 3,
-    title: "Luxury Beachfront Condo",
-    price: 780000,
-    bedrooms: 3,
-    bathrooms: 2,
-    area: 1800,
-    address: "789 Shore Blvd, Beachside, State",
-    type: "condo",
-    status: "for sale",
-    image: "https://images.unsplash.com/photo-1512917774080-9991f1c4c750?ixlib=rb-1.2.1&auto=format&fit=crop&w=1000&q=80",
-    favorite: false
-  },
-  {
-    id: 4,
-    title: "City Center Studio",
-    price: 1500,
-    bedrooms: 0,
-    bathrooms: 1,
-    area: 600,
-    address: "101 Center Ave, Downtown, City",
-    type: "apartment",
-    status: "for rent",
-    image: "https://images.unsplash.com/photo-1522708323590-d24dbb6b0267?ixlib=rb-1.2.1&auto=format&fit=crop&w=1000&q=80",
-    favorite: false
-  },
-  {
-    id: 5,
-    title: "Countryside Cottage",
-    price: 320000,
-    bedrooms: 2,
-    bathrooms: 1,
-    area: 1100,
-    address: "202 Rural Route, Countryside, Region",
-    type: "house",
-    status: "for sale",
-    image: "https://images.unsplash.com/photo-1575517111839-3a3843ee7f5d?ixlib=rb-1.2.1&auto=format&fit=crop&w=1000&q=80",
-    favorite: false
-  },
-  {
-    id: 6,
-    title: "Spacious Townhouse",
-    price: 2200,
-    bedrooms: 3,
-    bathrooms: 2.5,
-    area: 1600,
-    address: "303 Town Lane, Neighborhood, City",
-    type: "townhouse",
-    status: "for rent",
-    image: "https://images.unsplash.com/photo-1571055107559-3e67626fa8be?ixlib=rb-1.2.1&auto=format&fit=crop&w=1000&q=80",
-    favorite: false
-  }
-];
+import { fetchProperties } from '../services/propertyService';
+import { fetchUserFavorites, addFavorite, removeFavorite } from '../services/favoriteService';
+import { scheduleVisit } from '../services/visitService';
 
 const MainFeature = () => {
-  const [properties, setProperties] = useState(initialProperties);
+  // Get user from Redux store
+  const { user, isAuthenticated } = useSelector((state) => state.user);
+  const userEmail = user?.emailAddress;
+
+  // States for properties
+  const [properties, setProperties] = useState([]);
+  const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState(null);
+  
+  // States for favorites
+  const [favorites, setFavorites] = useState([]);
+  const [isFavoriteLoading, setIsFavoriteLoading] = useState(false);
+  
   const [selectedProperty, setSelectedProperty] = useState(null);
   const [scheduleProperty, setScheduleProperty] = useState(null);
   const [isScheduleModalOpen, setIsScheduleModalOpen] = useState(false);
@@ -97,6 +32,8 @@ const MainFeature = () => {
     phone: ''
   });
   const [isModalOpen, setIsModalOpen] = useState(false);
+  // States for loading
+  const [isSubmittingVisit, setIsSubmittingVisit] = useState(false);
   const [filters, setFilters] = useState({
     priceMin: "",
     priceMax: "",
@@ -110,7 +47,90 @@ const MainFeature = () => {
   // Apply filters when filter state changes
   useEffect(() => {
     let results = [...properties];
+    if (properties.length === 0) return;
     
+    // Add filter logic for backend filtering as well
+    setFilteredProperties(results);
+  }, [filters, properties]);
+
+  // Fetch properties and user favorites on component mount
+  useEffect(() => {
+    const loadProperties = async () => {
+      setIsLoading(true);
+      setError(null);
+      
+      try {
+        // Convert filters to backend format
+        const filterParams = {};
+        
+        if (filters.priceMin) {
+          filterParams.priceMin = parseInt(filters.priceMin);
+        }
+        
+        if (filters.priceMax) {
+          filterParams.priceMax = parseInt(filters.priceMax);
+        }
+        
+        if (filters.bedrooms) {
+          filterParams.bedrooms = parseInt(filters.bedrooms);
+        }
+        
+        if (filters.type) {
+          filterParams.type = filters.type;
+        }
+        
+        if (filters.status) {
+          filterParams.status = filters.status;
+        }
+        
+        const propertiesData = await fetchProperties(filterParams);
+        setProperties(propertiesData);
+        setFilteredProperties(propertiesData);
+      } catch (err) {
+        setError('Error loading properties. Please try again.');
+        toast.error('Could not load properties');
+        console.error(err);
+      } finally {
+        setIsLoading(false);
+      }
+    };
+    
+    loadProperties();
+  }, []);
+  
+  // Fetch user favorites if authenticated
+  useEffect(() => {
+    const loadFavorites = async () => {
+      if (!isAuthenticated || !userEmail) return;
+      
+      try {
+        const userFavorites = await fetchUserFavorites(userEmail);
+        setFavorites(userFavorites);
+      } catch (err) {
+        console.error('Error loading favorites:', err);
+      }
+    };
+    
+    loadFavorites();
+  }, [isAuthenticated, userEmail]);
+  
+  // Helper to check if a property is in favorites
+  const isPropertyFavorite = (propertyId) => {
+    return favorites.some(fav => fav.property_id === propertyId.toString());
+  };
+  
+  // Get favorite ID for a property (used for removal)
+  const getFavoriteId = (propertyId) => {
+    const favorite = favorites.find(fav => fav.property_id === propertyId.toString());
+    return favorite ? favorite.Id : null;
+  };
+
+  // Apply filters
+  useEffect(() => {
+    if (properties.length === 0) return;
+    
+    let results = [...properties];
+
     if (filters.priceMin) {
       results = results.filter(prop => 
         prop.price >= parseInt(filters.priceMin)
@@ -143,7 +163,7 @@ const MainFeature = () => {
     
     setFilteredProperties(results);
   }, [filters, properties]);
-
+  
   // Handle filter changes
   const handleFilterChange = (e) => {
     const { name, value } = e.target;
@@ -153,7 +173,7 @@ const MainFeature = () => {
     }));
   };
 
-  // Reset filters
+  // Reset filters and reload data
   const resetFilters = () => {
     setFilters({
       priceMin: "",
@@ -161,22 +181,50 @@ const MainFeature = () => {
       bedrooms: "",
       type: "",
       status: ""
-    });
+    setIsLoading(true);
+    fetchProperties()
+      .then(data => {
+        setProperties(data);
+        setFilteredProperties(data);
+        toast.info("Filters have been reset");
+      })
+      .catch(err => {
+        console.error(err);
+        toast.error("Could not reset filters");
+      })
+      .finally(() => {
+        setIsLoading(false);
+      });
     toast.info("Filters have been reset");
   };
 
-  // Toggle favorite status
-  const toggleFavorite = (id) => {
-    setProperties(prev => 
-      prev.map(prop => 
-        prop.id === id 
-          ? { ...prop, favorite: !prop.favorite } 
-          : prop
-      )
-    );
+  const toggleFavorite = async (property) => {
+    if (!isAuthenticated) {
+      toast.warning("Please log in to save favorites");
+      return;
+    }
     
-    const property = properties.find(p => p.id === id);
-    const action = !property.favorite ? "added to" : "removed from";
+    setIsFavoriteLoading(true);
+    
+    try {
+      const isFavorite = isPropertyFavorite(property.Id);
+      
+      if (isFavorite) {
+        const favoriteId = getFavoriteId(property.Id);
+        await removeFavorite(favoriteId);
+        setFavorites(prev => prev.filter(fav => fav.Id !== favoriteId));
+        toast.success("Property removed from favorites");
+      } else {
+        const result = await addFavorite(userEmail, property.Id, property.title);
+        setFavorites(prev => [...prev, result]);
+        toast.success("Property added to favorites");
+      }
+    } catch (error) {
+      toast.error("Could not update favorites");
+      console.error(error);
+    } finally {
+      setIsFavoriteLoading(false);
+    }
     toast.success(`Property ${action} favorites`);
   };
   
@@ -217,17 +265,41 @@ const MainFeature = () => {
   
   const handleScheduleSubmit = (e) => {
     e.preventDefault();
-    
-    // Validate form
-    if (!scheduleForm.date || !scheduleForm.time || !scheduleForm.name || !scheduleForm.email) {
-      toast.error("Please fill out all required fields");
-      return;
+    // Check if email is valid
+    if (!/\S+@\S+\.\S+/.test(scheduleForm.email)) {
+      toast.error("Please enter a valid email address");
+      return; 
+    }
+
+    // Set loading state
+    setIsSubmittingVisit(true);
+
+    // Prepare data for API
+    const visitData = {
+      property_id: scheduleProperty.Id,
+      date: scheduleForm.date,
+      time: scheduleForm.time,
+      email: scheduleForm.email,
+      phone: scheduleForm.phone || ''
     }
     
-    // Process form submission (in a real app, this would send data to a server)
-    toast.success(`Visit scheduled for ${scheduleForm.date} at ${scheduleForm.time}`);
-    
-    // Close modal and reset form
+    // Submit to API
+    scheduleVisit(visitData)
+      .then(() => {
+        toast.success(`Visit scheduled for ${scheduleForm.date} at ${scheduleForm.time}`);
+        // Close modal and reset form
+        closeScheduleModal();
+      })
+      .catch(error => {
+        console.error('Error scheduling visit:', error);
+        toast.error(
+          error.message || 
+          "Failed to schedule your visit. Please try again."
+        );
+      })
+      .finally(() => {
+        setIsSubmittingVisit(false);
+      });
     closeScheduleModal();
   };
 
@@ -336,10 +408,58 @@ const MainFeature = () => {
 
       {/* Property Grid */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-        {filteredProperties.length > 0 ? (
+        {isLoading ? (
+          // Loading state
+          Array(6).fill().map((_, index) => (
+            <div key={index} className="property-card animate-pulse">
+              <div className="bg-surface-200 dark:bg-surface-700 w-full h-48 rounded-t-xl"></div>
+              <div className="p-4">
+                <div className="h-6 bg-surface-200 dark:bg-surface-700 rounded w-3/4 mb-4"></div>
+                <div className="h-8 bg-surface-200 dark:bg-surface-700 rounded w-1/2 mb-3"></div>
+                <div className="h-4 bg-surface-200 dark:bg-surface-700 rounded w-full mb-4"></div>
+                <div className="flex flex-wrap gap-3">
+                  <div className="h-5 bg-surface-200 dark:bg-surface-700 rounded w-20"></div>
+                  <div className="h-5 bg-surface-200 dark:bg-surface-700 rounded w-20"></div>
+                  <div className="h-5 bg-surface-200 dark:bg-surface-700 rounded w-20"></div>
+                </div>
+              </div>
+            </div>
+          ))
+        ) : error ? (
+          // Error state
+          <div className="col-span-full flex flex-col items-center justify-center p-12 bg-surface-100 dark:bg-surface-800 rounded-xl">
+            <ApperIcon name="AlertCircle" className="h-16 w-16 text-red-500 mb-4" />
+            <h3 className="text-xl font-medium mb-2">Error Loading Properties</h3>
+            <p className="text-surface-500 dark:text-surface-400 text-center mb-6">
+              {error}
+            </p>
+            <button 
+              onClick={() => {
+                setIsLoading(true);
+                fetchProperties()
+                  .then(data => {
+                    setProperties(data);
+                    setFilteredProperties(data);
+                    setError(null);
+                  })
+                  .catch(err => {
+                    setError('Error loading properties. Please try again.');
+                    console.error(err);
+                  })
+                  .finally(() => {
+                    setIsLoading(false);
+                  });
+              }}
+              className="btn btn-primary"
+            >
+              Try Again
+            </button>
+          </div>
+        ) : filteredProperties.length > 0 ? (
+          // Properties grid
           filteredProperties.map(property => (
             <motion.div
-              key={property.id}
+              key={property.Id}
               className="property-card card-hover group"
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
@@ -353,13 +473,14 @@ const MainFeature = () => {
                 />
                 <div className="absolute top-4 right-4">
                   <button
-                    onClick={() => toggleFavorite(property.id)}
+                    onClick={() => toggleFavorite(property)}
+                    disabled={isFavoriteLoading}
                     className="p-2 rounded-full bg-white/80 dark:bg-surface-800/80 hover:bg-white dark:hover:bg-surface-700 transition-colors"
-                    aria-label={property.favorite ? "Remove from favorites" : "Add to favorites"}
+                    aria-label={isPropertyFavorite(property.Id) ? "Remove from favorites" : "Add to favorites"}
                   >
                     <ApperIcon 
-                      name={property.favorite ? "Heart" : "HeartOutline"} 
-                      className={`h-5 w-5 ${property.favorite ? 'text-red-500 fill-red-500' : 'text-surface-600'}`}
+                      name={isPropertyFavorite(property.Id) ? "Heart" : "HeartOutline"} 
+                      className={`h-5 w-5 ${isPropertyFavorite(property.Id) ? 'text-red-500 fill-red-500' : 'text-surface-600'}`}
                     />
                   </button>
                 </div>
@@ -377,8 +498,8 @@ const MainFeature = () => {
                 
                 <p className="text-xl font-bold text-primary mb-3">
                   {property.status === "for sale" 
-                    ? `$${property.price.toLocaleString()}` 
-                    : `$${property.price.toLocaleString()}/month`}
+                    ? `$${property.price ? property.price.toLocaleString() : 0}` 
+                    : `$${property.price ? property.price.toLocaleString() : 0}/month`}
                 </p>
                 
                 <p className="text-surface-600 dark:text-surface-400 text-sm mb-4">
@@ -415,6 +536,7 @@ const MainFeature = () => {
             </motion.div>
           ))
         ) : (
+          // Empty state
           <div className="col-span-full flex flex-col items-center justify-center p-12 bg-surface-100 dark:bg-surface-800 rounded-xl">
             <ApperIcon name="SearchX" className="h-16 w-16 text-surface-400 mb-4" />
             <h3 className="text-xl font-medium mb-2">No properties found</h3>
@@ -597,8 +719,15 @@ const MainFeature = () => {
                   <button type="button" onClick={closeScheduleModal} className="btn btn-outline">
                     Cancel
                   </button>
-                  <button type="submit" className="btn btn-primary">
-                    Confirm Visit
+                  <button 
+                    type="submit" 
+                    className="btn btn-primary"
+                    disabled={isSubmittingVisit}
+                  >
+                    {isSubmittingVisit ? (
+                      <ApperIcon name="Loader2" className="animate-spin mr-2" size={16} />
+                    ) : null}
+                    {isSubmittingVisit ? 'Scheduling...' : 'Confirm Visit'}
                   </button>
                 </div>
               </form>

@@ -1,39 +1,83 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
 import { toast } from 'react-toastify';
+import { useSelector } from 'react-redux';
 import MainFeature from '../components/MainFeature';
 import ApperIcon from '../components/ApperIcon';
+import { subscribe } from '../services/subscriptionService';
+import { fetchProperties } from '../services/propertyService';
 
 const Home = () => {
+  // Get user from Redux store
+  const { user, isAuthenticated } = useSelector((state) => state.user);
+  
   const [searchQuery, setSearchQuery] = useState('');
   const [isSubscribed, setIsSubscribed] = useState(false);
   const [email, setEmail] = useState('');
+  const [isSearching, setIsSearching] = useState(false);
+  const [isSubscribing, setIsSubscribing] = useState(false);
 
   const handleSearch = (e) => {
     e.preventDefault();
+    
+    setIsSearching(true);
     if (searchQuery.trim()) {
-      toast.info(`Searching for "${searchQuery}"...`);
-      // In a real app, this would trigger a search API call
+      // Search properties
+      fetchProperties({ query: searchQuery })
+        .then(results => {
+          // This would be handled in the MainFeature component in a real implementation
+          toast.info(`Found ${results.length} properties matching "${searchQuery}"`);
+        })
+        .catch(error => {
+          console.error('Search error:', error);
+          toast.error('Error during search. Please try again.');
+        })
+        .finally(() => {
+          setIsSearching(false);
+        });
     } else {
       toast.warning("Please enter a search term");
+      setIsSearching(false);
     }
   };
 
+  // Pre-fill email if user is authenticated
+  useEffect(() => {
+    if (isAuthenticated && user?.emailAddress) {
+      setEmail(user.emailAddress);
+    }
+  }, [isAuthenticated, user]);
+
   const handleSubscribe = (e) => {
     e.preventDefault();
-    
-    if (!email) {
+    setIsSubscribing(true);
+
+    // Validate email
+    if (!email.trim()) {
       toast.warning("Please enter your email address");
+      setIsSubscribing(false);
       return;
     }
-    
+
     if (!/\S+@\S+\.\S+/.test(email)) {
       toast.error("Please enter a valid email address");
+      setIsSubscribing(false);
       return;
     }
-    
-    setIsSubscribed(true);
-    toast.success("Thank you for subscribing to property alerts!");
+
+    // Submit subscription to service
+    subscribe(email)
+      .then(() => {
+        setIsSubscribed(true);
+        toast.success("Thank you for subscribing to property alerts!");
+      })
+      .catch(error => {
+        console.error('Subscription error:', error);
+        toast.error(error.message || "Failed to subscribe. Please try again.");
+      })
+      .finally(() => {
+        setIsSubscribing(false);
+      });
   };
 
   return (
@@ -76,9 +120,13 @@ const Home = () => {
               </div>
               <button 
                 type="submit"
-                className="py-3 px-6 bg-white text-primary font-medium rounded-lg hover:bg-opacity-90 transition-colors"
+                className="py-3 px-6 bg-white text-primary font-medium rounded-lg hover:bg-opacity-90 transition-colors flex items-center"
+                disabled={isSearching}
               >
-                Search
+                {isSearching ? (
+                  <ApperIcon name="Loader2" className="animate-spin mr-2" size={16} />
+                ) : null}
+                {isSearching ? 'Searching...' : 'Search'}
               </button>
             </div>
           </form>
@@ -144,8 +192,13 @@ const Home = () => {
               <button 
                 type="submit"
                 className="btn btn-primary whitespace-nowrap"
+                disabled={isSubscribing}
               >
-                Subscribe
+                {isSubscribing ? (
+                  <ApperIcon name="Loader2" className="animate-spin mr-2" size={16} />
+                ) : null}
+                {isSubscribing ? 'Subscribing...' : 'Subscribe'}
+
               </button>
             </form>
           ) : (
